@@ -1,4 +1,4 @@
-import { ClientSocket } from '../@interfaces/websocket.interface';
+import { ClientSocket } from '../@interfaces';
 
 export class RoomManager {
    private rooms = new Map<string, Set<ClientSocket>>();

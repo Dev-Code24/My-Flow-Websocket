@@ -17,6 +17,9 @@ wss.on("connection", (ws, req) => {
    client.participantId = participant.participantId;
 
    ROOM_MANAGER.join(client);
+
+   console.log(`${displayName} joined the room ${roomId}`);
+   console.log(`${roomId} has ${ ROOM_MANAGER.getRoomParticipants(roomId).size } participants`);
  
    const participants: ParticipantDetails[] = [...ROOM_MANAGER.getRoomParticipants(roomId)].map((cl: ClientSocket) => {
       return {
@@ -29,6 +32,16 @@ wss.on("connection", (ws, req) => {
    broadcastToClient<WsMessage<WsMessageType.CONNECTION_ESTABLISHED>>(connectionEstablishedRes, client);
    broadcastToRoom<WsMessage<WsMessageType.USER_JOINED>>(roomId, userJoinedRes, client);
    broadcastToClient<WsMessage<WsMessageType.ROOM_STATE>>(roomState, client);
+
+   client.on('message', (data) => {
+      const message = JSON.parse(data.toString());
+
+      switch (message.type) {
+         case WsMessageType.YJS_UPDATE:
+            broadcastToRoom(roomId, message, client);
+            break;
+      }
+   });
 
    handleConnectionClosed(roomId, participantId, displayName, client);
    handleConnectionErrored(roomId, participantId, displayName, client);
