@@ -1,35 +1,72 @@
 import { ClientSocket } from '../@interfaces';
 
 export class RoomManager {
-   private rooms = new Map<string, Set<ClientSocket>>();
+   private rooms = new Map<string, Map<string, ClientSocket>>();
 
    public join(client: ClientSocket): void {
       const roomId = client.roomId;
 
       if (!this.rooms.has(roomId)) {
-         this.rooms.set(roomId, new Set());
+         this.rooms.set(roomId, new Map());
       }
 
-      const roomSet = this.rooms.get(roomId);
-      if (roomSet) {
-         roomSet.add(client);
+      const room = this.rooms.get(roomId);
+
+      if (!room) {
+         return;
+      }
+
+      const existingClient = room.get(client.participantId);
+
+      room.set(client.participantId, client);
+
+      if (
+        existingClient &&
+        existingClient !== client
+      ) {
+         existingClient.close();
       }
    }
 
-   public leave(client: ClientSocket): void {
+   public leave(client: ClientSocket): boolean {
       const room = this.rooms.get(client.roomId);
 
-      if (!room) { return; }
+      if (!room) {
+         return false;
+      }
 
-      room.delete(client);
+      const currentClient = room.get(client.participantId);
+
+      if (currentClient !== client) {
+         return false;
+      }
+
+      room.delete(client.participantId);
 
       if (room.size === 0) {
          this.rooms.delete(client.roomId);
       }
+
+      return true;
    }
 
    public getRoomParticipants(roomId: string): Set<ClientSocket> {
-      return this.rooms.get(roomId) ?? new Set<ClientSocket>();
+      const room = this.rooms.get(roomId);
+
+      if (!room) {
+         return new Set<ClientSocket>();
+      }
+
+      return new Set(room.values());
+   }
+
+   public getParticipant(
+     roomId: string,
+     participantId: string,
+   ): ClientSocket | undefined {
+      return this.rooms
+        .get(roomId)
+        ?.get(participantId);
    }
 }
 
