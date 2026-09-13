@@ -1,5 +1,5 @@
 import { ClientSocket } from "../@interfaces";
-import { ROOM_MANAGER } from "../websocket/room-manager";
+import { ROOM_MANAGER } from "../room-manager";
 
 export function broadcastToRoom<T>(
    roomId: string,

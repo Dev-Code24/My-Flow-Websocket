@@ -1,1 +1,2 @@
-export * from "./websocket.interface";
+export * from './websocket.interfaces';
+export * from './history.interfaces';
