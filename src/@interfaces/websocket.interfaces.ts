@@ -1,6 +1,7 @@
 import http from 'http';
 import { JwtPayload } from 'jsonwebtoken';
 import WebSocket from 'ws';
+import { HistoryEntryDraft, RoomHistoryState } from '../@interfaces';
 
 export interface ClientSocket extends WebSocket {
   roomId: string;
@@ -27,6 +28,8 @@ export enum WsMessageType {
   YJS_SYNC_STEP_1 = 'YJS_SYNC_STEP_1',
   YJS_SYNC_STEP_2 = 'YJS_SYNC_STEP_2',
   YJS_UPDATE = 'YJS_UPDATE',
+  HISTORY_ENTRY_COMMIT = 'HISTORY_ENTRY_COMMIT',
+  ROOM_HISTORY_STATE = 'ROOM_HISTORY_STATE',
 }
 
 export interface ParticipantDetails {
@@ -59,6 +62,8 @@ export type MessageMap = {
   [WsMessageType.YJS_UPDATE]: {
     update: string;
   };
+  [WsMessageType.HISTORY_ENTRY_COMMIT]: HistoryEntryDraft;
+  [WsMessageType.ROOM_HISTORY_STATE]: RoomHistoryState;
 };
 
 export type WsMessage<T extends WsMessageType = WsMessageType> = {

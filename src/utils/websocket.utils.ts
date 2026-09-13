@@ -1,6 +1,6 @@
-import { ClientSocket, MessageMap, WsMessage, WsMessageType } from "../@interfaces";
-import { ROOM_MANAGER } from "../websocket/room-manager";
-import { broadcastToRoom } from "./broadcast.utils";
+import { ClientSocket, MessageMap, WsMessage, WsMessageType } from '../@interfaces';
+import { ROOM_MANAGER } from '../room-manager';
+import { broadcastToRoom } from './broadcast.utils';
 
 export function buildWsResponse<T extends WsMessageType>(
   type: T,
@@ -102,7 +102,7 @@ export function handleConnectionErrored(
 ): void {
    const userLeftRes: WsMessage<WsMessageType.USER_LEFT> = buildUserLeftResponse(participantId, displayName);
 
-   client.on("error", (error) => {
+   client.on('error', (error) => {
       const didLeave = ROOM_MANAGER.leave(client);
 
       if (!didLeave) {

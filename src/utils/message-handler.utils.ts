@@ -1,14 +1,15 @@
 import { RawData } from 'ws';
 
 import { ClientSocket, WsMessage, WsMessageType } from '../@interfaces';
-import { broadcastToClient, broadcastToRoom, buildWsResponse } from '../utils';
-import { ROOM_MANAGER } from '../websocket/room-manager';
+import { broadcastToClient, broadcastToRoom, buildWsResponse, isHistoryEntryDraft } from '../utils';
+import { ROOM_MANAGER } from '../room-manager';
+import { HISTORY_SERVICE } from '../services';
 
-export function handleWebSocketMessage(
+export async function handleWebSocketMessage(
   roomId: string,
   client: ClientSocket,
   data: RawData,
-): void {
+): Promise<void> {
   let message: WsMessage;
 
   try {
@@ -27,6 +28,31 @@ export function handleWebSocketMessage(
     case WsMessageType.YJS_SYNC_STEP_2:
     case WsMessageType.YJS_UPDATE: {
       broadcastToRoom(roomId, message, client);
+      return;
+    }
+
+    case WsMessageType.HISTORY_ENTRY_COMMIT: {
+      if (!isHistoryEntryDraft(message.message)) {
+        console.error('Invalid history entry received', client.participantId);
+        return;
+      }
+
+      try {
+        const result = await HISTORY_SERVICE.commitEntry(client.roomId, client.participantId, message.message);
+        const response: WsMessage<WsMessageType.ROOM_HISTORY_STATE> = {
+          type: WsMessageType.ROOM_HISTORY_STATE,
+          message: result.state,
+        };
+
+        if (result.appended) {
+          broadcastToRoom(client.roomId, response);
+        } else {
+          broadcastToClient(response, client);
+        }
+      } catch (error) {
+        console.error('Failed to commit history entry', error);
+      }
+
       return;
     }
   }

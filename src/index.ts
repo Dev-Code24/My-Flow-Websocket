@@ -4,15 +4,12 @@ import { wss } from "./websocket/server";
 import { verifyWsToken } from "./websocket/tokens";
 import { checkForEnvVariables } from "./utils";
 import { WsRequest } from "./@interfaces";
+import { connectRedis } from "./redis";
 
 checkForEnvVariables();
 
 const PORT = process.env.PORT;
 const server = http.createServer(app);
-
-server.listen(PORT, () => { 
-   console.log('Server is running on port', PORT);
-});
 
 server.on('upgrade', (req, socket, head) => {
    const url = new URL(req.url!, process.env.BASE_URL);
@@ -36,5 +33,15 @@ server.on('upgrade', (req, socket, head) => {
       socket.destroy();
    }
 });
+
+async function startServer() {
+   await connectRedis();
+
+   server.listen(PORT, () => {
+      console.log('Server is running on port', PORT);
+   });
+}
+
+void startServer();
 
 export default server;
