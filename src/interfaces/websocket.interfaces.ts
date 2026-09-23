@@ -1,7 +1,12 @@
 import http from 'http';
-import { JwtPayload } from 'jsonwebtoken';
 import WebSocket from 'ws';
-import { HistoryEntryDraft, RoomHistoryState } from '../@interfaces';
+import { JwtPayload } from 'jsonwebtoken';
+import { HistoryEntryDraft, RoomHistoryState } from './history.interfaces';
+
+interface YjsUpdatePayload {
+  updateId: string;
+  update: string;
+}
 
 export interface ClientSocket extends WebSocket {
   roomId: string;
@@ -19,6 +24,11 @@ export interface WsRequest extends http.IncomingMessage {
   participant: WsTokenPayload;
 }
 
+export interface HistoryNavigationRequest {
+  requestId: string;
+  expectedVersion: number;
+}
+
 export enum WsMessageType {
   CONNECTION_ESTABLISHED = 'CONNECTION_ESTABLISHED',
   USER_JOINED = 'USER_JOINED',
@@ -30,6 +40,7 @@ export enum WsMessageType {
   YJS_UPDATE = 'YJS_UPDATE',
   HISTORY_ENTRY_COMMIT = 'HISTORY_ENTRY_COMMIT',
   ROOM_HISTORY_STATE = 'ROOM_HISTORY_STATE',
+  UNDO_REQUEST = 'UNDO_REQUEST'
 }
 
 export interface ParticipantDetails {
@@ -56,14 +67,11 @@ export type MessageMap = {
     peerParticipantId: string;
     stateVector: string;
   };
-  [WsMessageType.YJS_SYNC_STEP_2]: {
-    update: string;
-  };
-  [WsMessageType.YJS_UPDATE]: {
-    update: string;
-  };
+  [WsMessageType.YJS_SYNC_STEP_2]: YjsUpdatePayload
+  [WsMessageType.YJS_UPDATE]: YjsUpdatePayload
   [WsMessageType.HISTORY_ENTRY_COMMIT]: HistoryEntryDraft;
   [WsMessageType.ROOM_HISTORY_STATE]: RoomHistoryState;
+  [WsMessageType.UNDO_REQUEST]: HistoryNavigationRequest;
 };
 
 export type WsMessage<T extends WsMessageType = WsMessageType> = {

@@ -1,9 +1,9 @@
 import { RawData } from 'ws';
 
-import { ClientSocket, WsMessage, WsMessageType } from '../@interfaces';
+import { ClientSocket, WsMessage, WsMessageType } from '../interfaces';
 import { broadcastToClient, broadcastToRoom, buildWsResponse, isHistoryEntryDraft } from '../utils';
 import { ROOM_MANAGER } from '../room-manager';
-import { HISTORY_SERVICE } from '../services';
+import { HISTORY_SERVICE, YJS_SERVICE } from '../services';
 
 export async function handleWebSocketMessage(
   roomId: string,
@@ -25,9 +25,26 @@ export async function handleWebSocketMessage(
       handleYjsSyncStepOne(roomId, client, message);
       return;
     }
-    case WsMessageType.YJS_SYNC_STEP_2:
+
+    case WsMessageType.YJS_SYNC_STEP_2: {
+      try {
+        await YJS_SERVICE.persistUpdate(roomId, message.message.updateId, message.message.update);
+        broadcastToRoom<WsMessage<WsMessageType.YJS_SYNC_STEP_2>>(roomId, message, client);
+      } catch (error) {
+        console.error('Failed to persist YJS_SYNC_STEP_2', error);
+      }
+
+      return;
+    }
+
     case WsMessageType.YJS_UPDATE: {
-      broadcastToRoom(roomId, message, client);
+      try {
+        await YJS_SERVICE.persistUpdate(roomId, message.message.updateId, message.message.update);
+        broadcastToRoom<WsMessage<WsMessageType.YJS_UPDATE>>(roomId, message, client);
+      } catch (error) {
+        console.error('Failed to persist YJS_UPDATE', error);
+      }
+
       return;
     }
 
@@ -53,6 +70,34 @@ export async function handleWebSocketMessage(
         console.error('Failed to commit history entry', error);
       }
 
+      return;
+    }
+
+    case WsMessageType.UNDO_REQUEST: {
+      const {expectedVersion } = message.message;
+      const result = await HISTORY_SERVICE.undo(roomId, expectedVersion);
+
+      if (result.status !== 'committed' && result.status !== 'already_committed') {
+        return;
+      }
+
+      const yjsUpdateMessage: WsMessage<WsMessageType.YJS_UPDATE> = {
+        type: WsMessageType.YJS_UPDATE,
+        message: {
+          updateId: result.updateId,
+          update: result.update,
+        },
+      };
+
+      broadcastToRoom<WsMessage<WsMessageType.YJS_UPDATE>>(roomId, yjsUpdateMessage);
+
+      const roomHistoryStateMessage: WsMessage<WsMessageType.ROOM_HISTORY_STATE> = {
+        type:
+        WsMessageType.ROOM_HISTORY_STATE,
+        message: result.state,
+      };
+
+      broadcastToRoom<WsMessage<WsMessageType.ROOM_HISTORY_STATE>>(roomId, roomHistoryStateMessage);
       return;
     }
   }

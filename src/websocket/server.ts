@@ -1,5 +1,5 @@
 import { WebSocketServer } from 'ws';
-import { ClientSocket, ParticipantDetails, WsMessage, WsMessageType, WsRequest } from '../@interfaces';
+import { ClientSocket, ParticipantDetails, WsMessage, WsMessageType, WsRequest } from '../interfaces';
 import { ROOM_MANAGER } from '../room-manager';
 import {
    broadcastToClient, broadcastToRoom, buildConnectionEstablishedResponse, buildRoomtStateResponse, buildUserJoinedResponse,
@@ -26,17 +26,22 @@ wss.on('connection', async (ws, req) => {
 
    console.log('Initial sync peer:', {
       joiningParticipantId: participantId,
-      syncPeerParticipantId:
-        syncPeer
-          ? syncPeer.participantId
-          : null,
+      syncPeerParticipantId: syncPeer ? syncPeer.participantId : null,
       syncRequired,
    });
 
    ROOM_MANAGER.join(client);
 
+   let messageProcessingQueue = Promise.resolve();
+
    client.on('message', (data) => {
-      void handleWebSocketMessage(roomId, client, data);
+      messageProcessingQueue = messageProcessingQueue
+        .then(() => {
+          return handleWebSocketMessage(roomId, client, data);
+        })
+        .catch((error) => {
+          console.error(`Failed to process websocket message for ${participantId}`, error);
+        });
    });
 
    console.log(`${displayName} joined the room ${roomId}`);

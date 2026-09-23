@@ -1,4 +1,4 @@
-import { ClientSocket } from '../@interfaces';
+import { ClientSocket } from '../interfaces';
 
 export class RoomManager {
    private rooms = new Map<string, Map<string, ClientSocket>>();

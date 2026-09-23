@@ -1,4 +1,4 @@
-import { HistoryElementState, HistoryEntryDraft } from '../@interfaces';
+import { HistoryElementState, HistoryEntryDraft } from '../interfaces';
 
 export function isHistoryEntryDraft(value: unknown): value is HistoryEntryDraft {
   if (!value || typeof value !== 'object') {
@@ -57,7 +57,7 @@ function isHistoryElementState(
   value: unknown,
   elementId: string,
 ): value is HistoryElementState {
-  if ( !value || typeof value !== 'object') {
+  if (!value || typeof value !== 'object') {
     return false;
   }
 
@@ -71,7 +71,27 @@ function isHistoryElementState(
     return false;
   }
 
+  if (!state.orderContext || typeof state.orderContext !== 'object') {
+    return false;
+  }
+
   const element = state.element as Record<string, unknown>;
 
-  return element.id === elementId;
+  if (element.id !== elementId) {
+    return false;
+  }
+
+  const orderContext = state.orderContext as Record<string, unknown>;
+  const previousElementId = orderContext.previousElementId;
+  const nextElementId = orderContext.nextElementId;
+
+  if (previousElementId !== null && typeof previousElementId !== 'string') {
+    return false;
+  }
+
+  if (nextElementId !== null && typeof nextElementId !== 'string') {
+    return false;
+  }
+
+  return true;
 }

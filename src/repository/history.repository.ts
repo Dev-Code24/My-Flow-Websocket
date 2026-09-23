@@ -1,15 +1,18 @@
-import { AppendHistoryEntryResult, CollaborationHistoryEntry, RoomHistoryState } from '../@interfaces';
+import { AppendHistoryEntryResult, CollaborationHistoryEntry, CommitUndoResult, RoomHistoryState } from '../interfaces';
 import { REDIS_CLIENT } from '../redis';
-import { buildRoomHistoryState, getRoomHistoryKeys, getRoomHistoryTtlSeconds } from "../utils";
-import { APPEND_HISTORY_ENTRY_SCRIPT, GET_HISTORY_STATE_SCRIPT } from "./scripts";
+import { buildRoomHistoryState, getRoomHistoryKeys, getRoomStateTtlSeconds, getRoomYjsKeys } from '../utils';
+import { APPEND_HISTORY_ENTRY_SCRIPT, COMMIT_UNDO_SCRIPT, GET_HISTORY_STATE_SCRIPT } from './scripts';
 
 const MAX_HISTORY_ENTRIES = 100;
 
 export class HistoryRepository {
-  public async append(roomId: string, entry: CollaborationHistoryEntry): Promise<AppendHistoryEntryResult> {
+  public async append(
+    roomId: string,
+    entry: CollaborationHistoryEntry
+  ): Promise<AppendHistoryEntryResult> {
     const { entriesKey, metaKey, seenEntryIdsKey } = getRoomHistoryKeys(roomId);
 
-    const ttlSeconds = getRoomHistoryTtlSeconds();
+    const ttlSeconds = getRoomStateTtlSeconds();
 
     const result = await REDIS_CLIENT.eval(
       APPEND_HISTORY_ENTRY_SCRIPT,
@@ -53,6 +56,100 @@ export class HistoryRepository {
     const [ cursor, historyVersion, historyLength ] = result;
 
     return buildRoomHistoryState(cursor, historyVersion, historyLength);
+  }
+
+  public async getEntry(
+    roomId: string,
+    index: number,
+  ): Promise<CollaborationHistoryEntry | null> {
+    if (index < 0) {
+      return null;
+    }
+
+    const { entriesKey } = getRoomHistoryKeys(roomId);
+    const serializedEntry = await REDIS_CLIENT.lIndex(entriesKey, index);
+
+    if (!serializedEntry) {
+      return null;
+    }
+
+    return JSON.parse(serializedEntry) as CollaborationHistoryEntry;
+  }
+
+  public async commitUndo(
+    roomId: string,
+    expectedVersion: number,
+    expectedCursor: number,
+    updateId: string,
+    update: string,
+  ): Promise<CommitUndoResult> {
+    const {entriesKey, metaKey, seenEntryIdsKey } = getRoomHistoryKeys(roomId);
+    const { updatesKey, seenUpdateIdsKey } = getRoomYjsKeys(roomId);
+    const ttlSeconds = getRoomStateTtlSeconds();
+
+    const result = await REDIS_CLIENT.eval(
+        COMMIT_UNDO_SCRIPT,
+        {
+          keys: [
+            metaKey,
+            entriesKey,
+            seenEntryIdsKey,
+            updatesKey,
+            seenUpdateIdsKey,
+          ],
+          arguments: [
+            String(expectedVersion),
+            String(expectedCursor),
+            updateId,
+            update,
+            String(ttlSeconds),
+          ],
+        },
+      ) as [number, number, number, number, string];
+
+    const [
+      status,
+      cursor,
+      historyVersion,
+      historyLength,
+      streamId,
+    ] = result;
+
+    const state: RoomHistoryState = {
+      cursor,
+      historyVersion,
+      historyLength,
+      canUndo: cursor > 0,
+      canRedo: cursor < historyLength,
+    };
+
+    if (status === 1) {
+      return {
+        status: 'committed',
+        state,
+        streamId,
+      };
+    }
+
+    if (status === 2) {
+      return {
+        status: 'already_committed',
+        state,
+        streamId,
+      };
+    }
+
+    if (status === 3) {
+      return {
+        status: 'nothing_to_undo',
+        state,
+      };
+    }
+
+    return {
+      status: 'stale',
+      state,
+    };
   }
 }
 

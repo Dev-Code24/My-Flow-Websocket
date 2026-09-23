@@ -1,4 +1,4 @@
-import { ClientSocket, MessageMap, WsMessage, WsMessageType } from '../@interfaces';
+import { ClientSocket, MessageMap, WsMessage, WsMessageType } from '../interfaces';
 import { ROOM_MANAGER } from '../room-manager';
 import { broadcastToRoom } from './broadcast.utils';
 

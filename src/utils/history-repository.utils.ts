@@ -1,4 +1,4 @@
-import { RoomHistoryState } from "../@interfaces";
+import { RoomHistoryState } from '../interfaces';
 
 export function getRoomHistoryKeys(
   roomId: string
@@ -7,12 +7,24 @@ export function getRoomHistoryKeys(
   metaKey: string;
   seenEntryIdsKey: string;
 } {
-  const prefix = `myflow:room:${roomId}:history`;
+  const prefix = `myflow:room:{${roomId}}:history`;
 
   return {
     entriesKey: `${prefix}:entries`,
     metaKey: `${prefix}:meta`,
     seenEntryIdsKey: `${prefix}:seen-entry-ids`,
+  };
+}
+
+export function getRoomYjsKeys(roomId: string): {
+  updatesKey: string;
+  seenUpdateIdsKey: string;
+} {
+  const prefix = `myflow:room:{${roomId}}:yjs`;
+
+  return {
+    updatesKey: `${prefix}:updates`,
+    seenUpdateIdsKey: `${prefix}:seen-update-ids`,
   };
 }
 
@@ -30,7 +42,7 @@ export function buildRoomHistoryState(
   };
 }
 
-export function getRoomHistoryTtlSeconds(): number {
+export function getRoomStateTtlSeconds(): number {
   const ttl = Number(process.env.ROOM_HISTORY_TTL_SECONDS);
 
   if ( !Number.isInteger(ttl) || ttl <= 0 ) {

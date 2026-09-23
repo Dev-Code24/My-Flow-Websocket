@@ -6,6 +6,10 @@ export interface HistoryElement {
 export interface HistoryElementState {
   element: HistoryElement;
   index: number;
+  orderContext: {
+    previousElementId: string | null;
+    nextElementId: string | null;
+  };
 }
 
 export interface HistoryElementChange {
@@ -37,3 +41,33 @@ export interface AppendHistoryEntryResult {
   appended: boolean;
   state: RoomHistoryState;
 }
+
+export type CommitUndoResult =
+| {
+  status: 'committed';
+  state: RoomHistoryState;
+  streamId: string;
+} | {
+  status: 'already_committed';
+  state: RoomHistoryState;
+  streamId: string;
+} | {
+  status: 'stale';
+  state: RoomHistoryState;
+} | {
+  status: 'nothing_to_undo';
+  state: RoomHistoryState;
+};
+
+export type ExecuteUndoResult =
+  | {
+    status:
+      | 'committed'
+      | 'already_committed';
+    state: RoomHistoryState;
+    update: string;
+    updateId: string;
+  } | {
+    status: 'stale' | 'nothing_to_undo';
+    state: RoomHistoryState;
+  };
