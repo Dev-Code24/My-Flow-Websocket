@@ -77,9 +77,7 @@ export class HistoryService {
     }
 
     const updateId = crypto.randomUUID();
-
     const update = await YJS_SERVICE.createUndoUpdate(roomId, undoTarget.entry);
-
     const commitResult = await HISTORY_REPOSITORY.commitUndo(
         roomId,
         expectedVersion,

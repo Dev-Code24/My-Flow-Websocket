@@ -61,13 +61,11 @@ export type CommitUndoResult =
 
 export type ExecuteUndoResult =
   | {
-    status:
-      | 'committed'
-      | 'already_committed';
+    status: 'committed' | 'already_committed';
     state: RoomHistoryState;
     update: string;
     updateId: string;
   } | {
-    status: 'stale' | 'nothing_to_undo';
+    status: 'stale' | 'nothing_to_undo' | 'edit_conflict';
     state: RoomHistoryState;
   };

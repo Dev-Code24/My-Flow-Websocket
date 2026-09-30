@@ -3,7 +3,7 @@ import { RawData } from 'ws';
 import { ClientSocket, WsMessage, WsMessageType } from '../interfaces';
 import { broadcastToClient, broadcastToRoom, buildWsResponse, isHistoryEntryDraft } from '../utils';
 import { ROOM_MANAGER } from '../room-manager';
-import { HISTORY_SERVICE, YJS_SERVICE } from '../services';
+import { EDIT_SERVICE, HISTORY_SERVICE, YJS_SERVICE } from '../services';
 
 export async function handleWebSocketMessage(
   roomId: string,
@@ -98,6 +98,71 @@ export async function handleWebSocketMessage(
       };
 
       broadcastToRoom<WsMessage<WsMessageType.ROOM_HISTORY_STATE>>(roomId, roomHistoryStateMessage);
+      return;
+    }
+
+    case WsMessageType.EDIT_BEGIN: {
+      const { editId, elementIds } = message.message;
+
+      if (elementIds.length === 0) {
+        return;
+      }
+
+      const accepted = await EDIT_SERVICE.beginEdit(
+          roomId,
+          client.participantId,
+          editId,
+          elementIds,
+        );
+
+      if (accepted) {
+        const response: WsMessage<WsMessageType.EDIT_ACCEPTED> = {
+          type: WsMessageType.EDIT_ACCEPTED,
+          message: {
+            editId,
+          },
+        };
+
+        broadcastToClient<WsMessage<WsMessageType.EDIT_ACCEPTED>>(response, client);
+
+        return;
+      }
+
+      const response: WsMessage<WsMessageType.EDIT_REJECTED> = {
+        type: WsMessageType.EDIT_REJECTED,
+        message: {
+          editId,
+        },
+      };
+
+      broadcastToClient<WsMessage<WsMessageType.EDIT_REJECTED>>(response, client);
+
+      return;
+    }
+
+    case WsMessageType.EDIT_KEEP_ALIVE: {
+      const { editId, elementIds } = message.message;
+
+      await EDIT_SERVICE.keepAlive(
+        roomId,
+        client.participantId,
+        editId,
+        elementIds,
+      );
+
+      return;
+    }
+
+    case WsMessageType.EDIT_END: {
+      const { editId, elementIds } = message.message;
+
+      await EDIT_SERVICE.endEdit(
+        roomId,
+        client.participantId,
+        editId,
+        elementIds,
+      );
+
       return;
     }
   }

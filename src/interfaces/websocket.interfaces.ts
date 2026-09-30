@@ -29,6 +29,29 @@ export interface HistoryNavigationRequest {
   expectedVersion: number;
 }
 
+export interface EditBeginRequest {
+  editId: string;
+  elementIds: string[];
+}
+
+export interface EditAccepted {
+  editId: string;
+}
+
+export interface EditRejected {
+  editId: string;
+}
+
+export interface EditKeepAlive {
+  editId: string;
+  elementIds: string[];
+}
+
+export interface EditEndRequest {
+  editId: string;
+  elementIds: string[];
+}
+
 export enum WsMessageType {
   CONNECTION_ESTABLISHED = 'CONNECTION_ESTABLISHED',
   USER_JOINED = 'USER_JOINED',
@@ -40,7 +63,12 @@ export enum WsMessageType {
   YJS_UPDATE = 'YJS_UPDATE',
   HISTORY_ENTRY_COMMIT = 'HISTORY_ENTRY_COMMIT',
   ROOM_HISTORY_STATE = 'ROOM_HISTORY_STATE',
-  UNDO_REQUEST = 'UNDO_REQUEST'
+  UNDO_REQUEST = 'UNDO_REQUEST',
+  EDIT_BEGIN = 'EDIT_BEGIN',
+  EDIT_ACCEPTED = 'EDIT_ACCEPTED',
+  EDIT_REJECTED = 'EDIT_REJECTED',
+  EDIT_KEEP_ALIVE = 'EDIT_KEEP_ALIVE',
+  EDIT_END = 'EDIT_END',
 }
 
 export interface ParticipantDetails {
@@ -72,6 +100,11 @@ export type MessageMap = {
   [WsMessageType.HISTORY_ENTRY_COMMIT]: HistoryEntryDraft;
   [WsMessageType.ROOM_HISTORY_STATE]: RoomHistoryState;
   [WsMessageType.UNDO_REQUEST]: HistoryNavigationRequest;
+  [WsMessageType.EDIT_BEGIN]: EditBeginRequest;
+  [WsMessageType.EDIT_ACCEPTED]: EditAccepted;
+  [WsMessageType.EDIT_REJECTED]: EditRejected;
+  [WsMessageType.EDIT_KEEP_ALIVE]: EditKeepAlive;
+  [WsMessageType.EDIT_END]: EditEndRequest;
 };
 
 export type WsMessage<T extends WsMessageType = WsMessageType> = {
