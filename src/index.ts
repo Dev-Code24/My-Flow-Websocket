@@ -37,7 +37,7 @@ server.on('upgrade', (req, socket, head) => {
 async function startServer() {
    await connectRedis();
 
-   server.listen(PORT, "0.0.0.0", () => {
+   server.listen(PORT, () => {
       console.log('Server is running on port', PORT);
    });
 }
