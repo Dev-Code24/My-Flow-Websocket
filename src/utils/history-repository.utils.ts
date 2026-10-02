@@ -1,8 +1,6 @@
 import { RoomHistoryState } from '../interfaces';
 
-export function getRoomHistoryKeys(
-  roomId: string
-): {
+export function getRoomHistoryKeys(roomId: string): {
   entriesKey: string;
   metaKey: string;
   seenEntryIdsKey: string;
@@ -50,4 +48,8 @@ export function getRoomStateTtlSeconds(): number {
   }
 
   return ttl;
+}
+
+export function getRoomElementLocksKey(roomId: string): string {
+  return `myflow:room:{${roomId}}:element-locks`;
 }

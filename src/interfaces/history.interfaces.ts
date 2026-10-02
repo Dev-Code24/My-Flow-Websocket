@@ -57,6 +57,33 @@ export type CommitUndoResult =
 } | {
   status: 'nothing_to_undo';
   state: RoomHistoryState;
+}  | {
+  status: 'edit_conflict';
+  state: RoomHistoryState;
+};
+
+export type CommitRedoResult =
+  | {
+  status: 'committed';
+  state: RoomHistoryState;
+  streamId: string;
+}
+  | {
+  status: 'already_committed';
+  state: RoomHistoryState;
+  streamId: string;
+}
+  | {
+  status: 'stale';
+  state: RoomHistoryState;
+}
+  | {
+  status: 'nothing_to_redo';
+  state: RoomHistoryState;
+}
+  | {
+  status: 'edit_conflict';
+  state: RoomHistoryState;
 };
 
 export type ExecuteUndoResult =
@@ -69,3 +96,14 @@ export type ExecuteUndoResult =
     status: 'stale' | 'nothing_to_undo' | 'edit_conflict';
     state: RoomHistoryState;
   };
+
+export type ExecuteRedoResult =
+  | {
+  status: 'committed' | 'already_committed';
+  state: RoomHistoryState;
+  update: string;
+  updateId: string;
+} | {
+  status: 'stale' | 'nothing_to_redo' | 'edit_conflict';
+  state: RoomHistoryState;
+};

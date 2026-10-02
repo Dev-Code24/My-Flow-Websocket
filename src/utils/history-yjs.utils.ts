@@ -31,6 +31,25 @@ export function applyUndoEntry(
   });
 }
 
+export function applyRedoEntry(
+  document: Y.Doc,
+  entry: CollaborationHistoryEntry,
+): void {
+  const yElements = document.getMap<YElementMap>(YJS_DOCUMENT_KEYS.ELEMENTS);
+  const yElementOrder = document.getArray<string>(YJS_DOCUMENT_KEYS.ELEMENT_ORDER);
+
+  document.transact(() => {
+    for (const change of entry.changes) {
+      if (change.after === null) {
+        removeElementState(yElements, yElementOrder, change.elementId);
+        continue;
+      }
+
+      restoreElementState(yElements, yElementOrder, change.after);
+    }
+  });
+}
+
 function restoreElementState(
   yElements: YElementsMap,
   yElementOrder: YElementOrder,

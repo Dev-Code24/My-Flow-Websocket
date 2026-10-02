@@ -4,13 +4,11 @@ local historySeenEntryIdsKey = KEYS[3]
 local yjsUpdatesKey = KEYS[4]
 local yjsSeenUpdateIdsKey = KEYS[5]
 local elementLocksKey = KEYS[6]
-
 local expectedVersion = tonumber(ARGV[1])
 local expectedCursor = tonumber(ARGV[2])
 local updateId = ARGV[3]
 local update = ARGV[4]
 local ttlSeconds = tonumber(ARGV[5])
-
 local currentCursor = tonumber(redis.call('HGET', metaKey, 'cursor') or '0')
 local currentVersion = tonumber(redis.call('HGET', metaKey, 'historyVersion') or '0')
 local historyLength = redis.call('LLEN', entriesKey)
@@ -32,7 +30,9 @@ if existingStreamId then
     }
 end
 
-if currentVersion ~= expectedVersion or currentCursor ~= expectedCursor then
+if
+currentVersion ~= expectedVersion or currentCursor ~= expectedCursor
+then
     return {
         0,
         currentCursor,
@@ -42,7 +42,7 @@ if currentVersion ~= expectedVersion or currentCursor ~= expectedCursor then
     }
 end
 
-if currentCursor <= 0 then
+if currentCursor >= historyLength then
     return {
         3,
         currentCursor,
@@ -53,11 +53,7 @@ if currentCursor <= 0 then
 end
 
 local redisTime = redis.call('TIME')
-local nowMillis =
-(tonumber(redisTime[1]) * 1000)
-        + math.floor(
-        tonumber(redisTime[2]) / 1000
-)
+local nowMillis = (tonumber(redisTime[1]) * 1000) + math.floor(tonumber(redisTime[2]) / 1000)
 
 for i = 6, #ARGV do
     local elementId = ARGV[i]
@@ -65,11 +61,14 @@ for i = 6, #ARGV do
 
     if existingValue then
         local existingLock = cjson.decode(existingValue)
-
         local isExpired = tonumber(existingLock.expiresAt) <= nowMillis
 
         if isExpired then
-            redis.call('HDEL', elementLocksKey, elementId)
+            redis.call(
+                    'HDEL',
+                    elementLocksKey,
+                    elementId
+            )
         else
             return {
                 4,
@@ -82,11 +81,11 @@ for i = 6, #ARGV do
     end
 end
 
-local streamId = redis.call('XADD', yjsUpdatesKey, '*', 'updateId', updateId, 'update', update)
+local streamId =redis.call('XADD', yjsUpdatesKey, '*', 'updateId', updateId, 'update', update)
 redis.call('HSET', yjsSeenUpdateIdsKey, updateId, streamId)
 
-local newCursor = currentCursor - 1
-local newVersion = currentVersion + 1
+local newCursor =currentCursor + 1
+local newVersion =currentVersion + 1
 
 redis.call('HSET', metaKey, 'cursor', newCursor, 'historyVersion', newVersion)
 redis.call('EXPIRE', metaKey, ttlSeconds)

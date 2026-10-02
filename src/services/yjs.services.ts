@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 
 import { YJS_REPOSITORY } from '../repository';
 import { CollaborationHistoryEntry } from "../interfaces";
-import { applyUndoEntry } from "../utils/history-yjs.utils";
+import { applyRedoEntry, applyUndoEntry } from "../utils/history-yjs.utils";
 
 const REDIS_WRITE_ATTEMPT_DELAYS_MS = [ 0, 50, 150] as const;
 
@@ -93,6 +93,28 @@ export class YjsService {
     }
 
     return Buffer.from(undoUpdate).toString('base64');
+  }
+
+  public async createRedoUpdate(
+    roomId: string,
+    entry: CollaborationHistoryEntry,
+  ): Promise<string> {
+    const document = await this.reconstructDocument(roomId);
+    let redoUpdate: Uint8Array | null = null;
+
+    const handleUpdate = (update: Uint8Array): void => {
+      redoUpdate = update;
+    };
+
+    document.once('update', handleUpdate);
+
+    applyRedoEntry(document, entry);
+
+    if (redoUpdate === null) {
+      throw new Error(`Redo did not produce a Yjs update for room ${roomId}`);
+    }
+
+    return Buffer.from(redoUpdate).toString('base64');
   }
 }
 

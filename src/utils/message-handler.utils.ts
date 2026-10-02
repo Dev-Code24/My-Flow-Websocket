@@ -101,6 +101,35 @@ export async function handleWebSocketMessage(
       return;
     }
 
+    case WsMessageType.REDO_REQUEST: {
+      const { expectedVersion } = message.message;
+      const result = await HISTORY_SERVICE.redo(roomId, expectedVersion);
+
+      if (result.status !== 'committed' && result.status !== 'already_committed') {
+        return;
+      }
+
+      const yjsUpdateMessage: WsMessage<WsMessageType.YJS_UPDATE> = {
+          type: WsMessageType.YJS_UPDATE,
+          message: {
+            updateId: result.updateId,
+            update: result.update,
+          },
+        };
+
+      broadcastToRoom<WsMessage<WsMessageType.YJS_UPDATE>>(roomId, yjsUpdateMessage);
+
+      const roomHistoryStateMessage: WsMessage<WsMessageType.ROOM_HISTORY_STATE> = {
+          type:
+          WsMessageType.ROOM_HISTORY_STATE,
+          message: result.state,
+        };
+
+      broadcastToRoom<WsMessage<WsMessageType.ROOM_HISTORY_STATE>>(roomId, roomHistoryStateMessage);
+
+      return;
+    }
+
     case WsMessageType.EDIT_BEGIN: {
       const { editId, elementIds } = message.message;
 

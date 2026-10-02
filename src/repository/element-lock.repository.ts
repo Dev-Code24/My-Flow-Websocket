@@ -1,7 +1,7 @@
 import { REDIS_CLIENT } from '../redis';
 
 import { ACQUIRE_ELEMENT_LOCKS_SCRIPT, RELEASE_ELEMENT_LOCKS_SCRIPT, RENEW_ELEMENT_LOCKS_SCRIPT } from './scripts';
-import { getRoomStateTtlSeconds } from '../utils';
+import { getRoomElementLocksKey, getRoomStateTtlSeconds } from '../utils';
 
 export interface AcquireElementLocksResult {
   acquired: boolean;
@@ -20,9 +20,7 @@ export class ElementLockRepository {
     const result = await REDIS_CLIENT.eval(
         ACQUIRE_ELEMENT_LOCKS_SCRIPT,
         {
-          keys: [
-            this.getLocksKey(roomId),
-          ],
+          keys: [ getRoomElementLocksKey(roomId) ],
           arguments: [
             participantId,
             interactionId,
@@ -57,9 +55,7 @@ export class ElementLockRepository {
     const result = await REDIS_CLIENT.eval(
         RENEW_ELEMENT_LOCKS_SCRIPT,
         {
-          keys: [
-            this.getLocksKey(roomId),
-          ],
+          keys: [ getRoomElementLocksKey(roomId) ],
           arguments: [
             participantId,
             interactionId,
@@ -82,9 +78,7 @@ export class ElementLockRepository {
     await REDIS_CLIENT.eval(
       RELEASE_ELEMENT_LOCKS_SCRIPT,
       {
-        keys: [
-          this.getLocksKey(roomId),
-        ],
+        keys: [ getRoomElementLocksKey(roomId) ],
         arguments: [
           participantId,
           interactionId,
@@ -92,10 +86,6 @@ export class ElementLockRepository {
         ],
       },
     );
-  }
-
-  private getLocksKey(roomId: string): string {
-    return `myflow:room:{${roomId}}:element-locks`;
   }
 }
 
