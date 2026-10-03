@@ -1,18 +1,15 @@
-import http from "http";
-import app  from "./app";
-import { wss } from "./websocket/server";
-import { verifyWsToken } from "./websocket/tokens";
-import { checkForEnvVariables } from "./utils";
-import { WsRequest } from "./@interfaces";
+import http from 'http';
+import app  from './app';
+import { wss } from './websocket/server';
+import { verifyWsToken } from './websocket/tokens';
+import { checkForEnvVariables } from './utils';
+import { WsRequest } from './interfaces';
+import { connectRedis } from './redis';
 
 checkForEnvVariables();
 
 const PORT = process.env.PORT;
 const server = http.createServer(app);
-
-server.listen(PORT, () => { 
-   console.log('Server is running on port', PORT);
-});
 
 server.on('upgrade', (req, socket, head) => {
    const url = new URL(req.url!, process.env.BASE_URL);
@@ -29,11 +26,22 @@ server.on('upgrade', (req, socket, head) => {
       (req as WsRequest).participant = payload;
    
       wss.handleUpgrade(req, socket, head, (ws) => {
-         wss.emit("connection", ws, req);
+         wss.emit('connection', ws, req);
       })
    } catch (error) {
       console.error('Something went wrong while connection upgrade.', error);
       socket.destroy();
    }
 });
+
+async function startServer() {
+   await connectRedis();
+
+   server.listen(PORT, "0.0.0.0", () => {
+      console.log('Server is running on port', PORT);
+   });
+}
+
+void startServer();
+
 export default server;
