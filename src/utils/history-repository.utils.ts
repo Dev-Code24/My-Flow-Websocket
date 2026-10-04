@@ -15,12 +15,14 @@ export function getRoomHistoryKeys(roomId: string): {
 }
 
 export function getRoomYjsKeys(roomId: string): {
+  snapshotKey: string;
   updatesKey: string;
   seenUpdateIdsKey: string;
 } {
   const prefix = `myflow:room:{${roomId}}:yjs`;
 
   return {
+    snapshotKey: `${prefix}:snapshot`,
     updatesKey: `${prefix}:updates`,
     seenUpdateIdsKey: `${prefix}:seen-update-ids`,
   };

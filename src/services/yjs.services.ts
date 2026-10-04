@@ -4,13 +4,98 @@ import { YJS_REPOSITORY } from '../repository';
 import { CollaborationHistoryEntry } from "../interfaces";
 import { applyRedoEntry, applyUndoEntry } from "../utils/history-yjs.utils";
 
+interface ReconstructedYjsDocument {
+  document: Y.Doc;
+  snapshotWatermark: string | null;
+  lastAppliedStreamId: string | null;
+}
+
 const REDIS_WRITE_ATTEMPT_DELAYS_MS = [ 0, 50, 150] as const;
+const YJS_COMPACTION_UPDATE_THRESHOLD = 100;
 
 export class YjsService {
+  private readonly roomsBeingCompacted = new Set<string>();
+
   private async wait(milliseconds: number): Promise<void> {
     await new Promise<void>((resolve) => {
       setTimeout(resolve, milliseconds);
     });
+  }
+
+  private async reconstructDocumentState(roomId: string): Promise<ReconstructedYjsDocument> {
+    while (true) {
+      const snapshotBefore = await YJS_REPOSITORY.getSnapshot(roomId);
+      const document = new Y.Doc();
+
+      if (snapshotBefore) {
+        this.applyBase64Update(document, snapshotBefore.update);
+      }
+
+      const updates = await YJS_REPOSITORY.getUpdatesAfter(roomId, snapshotBefore?.watermark ?? null);
+
+      for (const entry of updates) {
+        this.applyBase64Update(document, entry.update);
+      }
+
+      const snapshotAfter = await YJS_REPOSITORY.getSnapshot(roomId);
+      const snapshotWatermarkBefore = snapshotBefore?.watermark ?? null;
+      const snapshotWatermarkAfter = snapshotAfter?.watermark ?? null;
+
+      if (snapshotWatermarkBefore === snapshotWatermarkAfter) {
+        const lastUpdate = updates.length > 0 ? updates[updates.length - 1] : undefined;
+
+        return {
+          document,
+          snapshotWatermark:
+          snapshotWatermarkBefore,
+          lastAppliedStreamId: lastUpdate ? lastUpdate.id : snapshotWatermarkBefore,
+        };
+      }
+
+      document.destroy();
+    }
+  }
+
+  private applyBase64Update(
+    document: Y.Doc,
+    update: string,
+  ): void {
+    const binaryUpdate = Buffer.from(update, 'base64');
+    Y.applyUpdate(document, binaryUpdate);
+  }
+
+  private async maybeCompactDocument(roomId: string): Promise<void> {
+    if (this.roomsBeingCompacted.has(roomId)) {
+      return;
+    }
+
+    try {
+      const uncompactedUpdateCount = await YJS_REPOSITORY.getUncompactedUpdateCount(roomId);
+
+      if (uncompactedUpdateCount < YJS_COMPACTION_UPDATE_THRESHOLD) {
+        return;
+      }
+
+      if (this.roomsBeingCompacted.has(roomId)) {
+        return;
+      }
+
+      this.roomsBeingCompacted.add(roomId);
+
+      const compacted = await this.compactDocument(roomId);
+
+      if (compacted) {
+        console.log(`Compacted Yjs document for room ${roomId}`);
+      }
+    } catch (error) {
+      console.error(`Failed to compact Yjs document for room ${roomId}`, error);
+    } finally {
+      const wasCompacting = this.roomsBeingCompacted.delete(roomId);
+
+      if (wasCompacting) {
+        void this.maybeCompactDocument(roomId);
+      }
+    }
   }
 
   public async persistUpdate(
@@ -27,6 +112,10 @@ export class YjsService {
 
       try {
         const result = await YJS_REPOSITORY.appendUpdate(roomId, updateId, update);
+
+        if (result.appended) {
+          void this.maybeCompactDocument(roomId);
+        }
 
         return result.streamId;
       } catch (error) {
@@ -47,28 +136,7 @@ export class YjsService {
   }
 
   public async getDocument(roomId: string): Promise<Y.Doc> {
-    const document = new Y.Doc();
-    const updates = await YJS_REPOSITORY.getUpdates(roomId);
-
-    updates.forEach(({ update }) => {
-      const binaryUpdate = Uint8Array.from(Buffer.from(update, 'base64'));
-
-      Y.applyUpdate(document, binaryUpdate);
-    });
-
-    return document;
-  }
-
-  public async reconstructDocument(roomId: string): Promise<Y.Doc> {
-    const document = new Y.Doc();
-    const updates = await YJS_REPOSITORY.getUpdates(roomId);
-
-    for (const entry of updates) {
-      const update = Buffer.from(entry.update, 'base64');
-
-      Y.applyUpdate(document, update);
-    }
-
+    const { document } = await this.reconstructDocumentState(roomId);
     return document;
   }
 
@@ -76,7 +144,7 @@ export class YjsService {
     roomId: string,
     entry: CollaborationHistoryEntry,
   ): Promise<string> {
-    const document = await this.reconstructDocument(roomId);
+    const { document } = await this.reconstructDocumentState(roomId);
 
     let undoUpdate: Uint8Array | null = null;
 
@@ -99,7 +167,7 @@ export class YjsService {
     roomId: string,
     entry: CollaborationHistoryEntry,
   ): Promise<string> {
-    const document = await this.reconstructDocument(roomId);
+    const { document } = await this.reconstructDocumentState(roomId);
     let redoUpdate: Uint8Array | null = null;
 
     const handleUpdate = (update: Uint8Array): void => {
@@ -115,6 +183,30 @@ export class YjsService {
     }
 
     return Buffer.from(redoUpdate).toString('base64');
+  }
+
+  public async compactDocument(roomId: string): Promise<boolean> {
+    const { document, snapshotWatermark, lastAppliedStreamId } = await this.reconstructDocumentState(roomId);
+
+    try {
+      if (lastAppliedStreamId === null || lastAppliedStreamId === snapshotWatermark) {
+        return false;
+      }
+
+      const snapshotUpdate = Y.encodeStateAsUpdate(document);
+      const encodedSnapshot = Buffer.from(snapshotUpdate).toString('base64');
+
+      const result = await YJS_REPOSITORY.commitSnapshot(
+          roomId,
+          snapshotWatermark,
+          lastAppliedStreamId,
+          encodedSnapshot,
+        );
+
+      return result.committed;
+    } finally {
+      document.destroy();
+    }
   }
 }
 
