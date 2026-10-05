@@ -1,8 +1,7 @@
 import { RawData } from 'ws';
 
 import { ClientSocket, WsMessage, WsMessageType } from '../interfaces';
-import { broadcastToClient, broadcastToRoom, buildWsResponse, isHistoryEntryDraft } from '../utils';
-import { ROOM_MANAGER } from '../room-manager';
+import { broadcastToClient, broadcastToRoom, isHistoryEntryDraft } from '../utils';
 import { EDIT_SERVICE, HISTORY_SERVICE, YJS_SERVICE } from '../services';
 
 export async function handleWebSocketMessage(
@@ -21,22 +20,6 @@ export async function handleWebSocketMessage(
   }
 
   switch (message.type) {
-    case WsMessageType.YJS_SYNC_STEP_1: {
-      handleYjsSyncStepOne(roomId, client, message);
-      return;
-    }
-
-    case WsMessageType.YJS_SYNC_STEP_2: {
-      try {
-        await YJS_SERVICE.persistUpdate(roomId, message.message.updateId, message.message.update);
-        broadcastToRoom<WsMessage<WsMessageType.YJS_SYNC_STEP_2>>(roomId, message, client);
-      } catch (error) {
-        console.error('Failed to persist YJS_SYNC_STEP_2', error);
-      }
-
-      return;
-    }
-
     case WsMessageType.YJS_UPDATE: {
       try {
         await YJS_SERVICE.persistUpdate(roomId, message.message.updateId, message.message.update);
@@ -195,27 +178,4 @@ export async function handleWebSocketMessage(
       return;
     }
   }
-}
-
-function handleYjsSyncStepOne(
-  roomId: string,
-  client: ClientSocket,
-  message: WsMessage<WsMessageType.YJS_SYNC_STEP_1>,
-): void {
-  const syncPeer = ROOM_MANAGER.getParticipant(roomId, message.message.peerParticipantId);
-
-  if (!syncPeer) {
-    return;
-  }
-
-  const forwardedMessage: WsMessage<WsMessageType.YJS_SYNC_STEP_1> =
-    buildWsResponse(
-      WsMessageType.YJS_SYNC_STEP_1,
-      {
-        peerParticipantId: client.participantId,
-        stateVector: message.message.stateVector,
-      },
-    );
-
-  broadcastToClient(forwardedMessage, syncPeer);
 }

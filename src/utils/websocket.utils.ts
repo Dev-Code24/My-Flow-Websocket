@@ -16,26 +16,24 @@ export function buildConnectionEstablishedResponse(
   participantId: string,
   roomId: string,
   displayName: string,
-  syncRequired: boolean,
 ): WsMessage<WsMessageType.CONNECTION_ESTABLISHED> {
-   return buildWsResponse(
-     WsMessageType.CONNECTION_ESTABLISHED,
-     {
-        participantId,
-        roomId,
-        displayName,
-        syncRequired,
-     },
-   );
+  return buildWsResponse<WsMessageType.CONNECTION_ESTABLISHED>(
+    WsMessageType.CONNECTION_ESTABLISHED,
+    {
+      participantId,
+      roomId,
+      displayName,
+    },
+  );
 }
 
-export function buildYjsSyncRequest(peerParticipantId: string): WsMessage<WsMessageType.YJS_SYNC_REQUEST> {
-   return buildWsResponse(
-     WsMessageType.YJS_SYNC_REQUEST,
-     {
-        peerParticipantId,
-     },
-   );
+export function buildYjsSyncResponse(update: string): WsMessage<WsMessageType.YJS_SYNC> {
+  return buildWsResponse(
+    WsMessageType.YJS_SYNC,
+    {
+      update,
+    },
+  );
 }
 
 export function buildUserJoinedResponse(

@@ -208,6 +208,18 @@ export class YjsService {
       document.destroy();
     }
   }
+
+  public async getEncodedDocumentState(roomId: string): Promise<string> {
+    const {document } = await this.reconstructDocumentState(roomId);
+
+    try {
+      const update = Y.encodeStateAsUpdate(document);
+
+      return Buffer.from(update).toString('base64');
+    } finally {
+      document.destroy();
+    }
+  }
 }
 
 export const YJS_SERVICE = new YjsService();

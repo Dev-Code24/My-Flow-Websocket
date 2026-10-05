@@ -3,10 +3,10 @@ import { ClientSocket, ParticipantDetails, WsMessage, WsMessageType, WsRequest }
 import { ROOM_MANAGER } from '../room-manager';
 import {
    broadcastToClient, broadcastToRoom, buildConnectionEstablishedResponse, buildRoomtStateResponse, buildUserJoinedResponse,
-   buildYjsSyncRequest, handleConnectionClosed, handleConnectionErrored,
+   buildYjsSyncResponse, handleConnectionClosed, handleConnectionErrored,
 } from '../utils';
 import { handleWebSocketMessage } from '../utils';
-import { HISTORY_SERVICE } from "../services";
+import { HISTORY_SERVICE, YJS_SERVICE } from '../services';
 
 export const wss = new WebSocketServer({ noServer: true });
 
@@ -18,17 +18,8 @@ wss.on('connection', async (ws, req) => {
    client.displayName = participant.displayName;
    client.participantId = participant.participantId;
 
-   const existingParticipants: Set<ClientSocket> = ROOM_MANAGER.getRoomParticipants(roomId);
-   const syncPeer: ClientSocket | undefined = [...existingParticipants.values()].find((existingClient: ClientSocket) => existingClient.participantId !== participantId);
-   const syncRequired: boolean = syncPeer !== undefined;
-   const connectionEstablishedRes: WsMessage<WsMessageType.CONNECTION_ESTABLISHED> = buildConnectionEstablishedResponse(participantId, roomId, displayName, syncRequired);
+   const connectionEstablishedRes: WsMessage<WsMessageType.CONNECTION_ESTABLISHED> = buildConnectionEstablishedResponse(participantId, roomId, displayName);
    const userJoinedRes: WsMessage<WsMessageType.USER_JOINED> = buildUserJoinedResponse(participantId, displayName);
-
-   console.log('Initial sync peer:', {
-      joiningParticipantId: participantId,
-      syncPeerParticipantId: syncPeer ? syncPeer.participantId : null,
-      syncRequired,
-   });
 
    ROOM_MANAGER.join(client);
 
@@ -67,9 +58,15 @@ wss.on('connection', async (ws, req) => {
    broadcastToRoom<WsMessage<WsMessageType.USER_JOINED>>(roomId, userJoinedRes, client);
    broadcastToClient<WsMessage<WsMessageType.ROOM_STATE>>(roomState, client);
 
-   if (syncPeer) {
-      broadcastToClient<WsMessage<WsMessageType.YJS_SYNC_REQUEST>>(buildYjsSyncRequest(syncPeer.participantId), client);
-      broadcastToClient<WsMessage<WsMessageType.YJS_SYNC_REQUEST>>(buildYjsSyncRequest(client.participantId), syncPeer);
+   try {
+      const initialUpdate = await YJS_SERVICE.getEncodedDocumentState(roomId);
+      const yjsSync: WsMessage<WsMessageType.YJS_SYNC> = buildYjsSyncResponse(initialUpdate);
+
+      broadcastToClient<WsMessage<WsMessageType.YJS_SYNC>>(yjsSync, client);
+   } catch (error) {
+      console.error(`Failed to synchronize Yjs document for room ${roomId}`, error);
+      client.close(1011, 'Initial synchronization failed');
+      return;
    }
 
    handleConnectionClosed(roomId, participantId, displayName, client);
