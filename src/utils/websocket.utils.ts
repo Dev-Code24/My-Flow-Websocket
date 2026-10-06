@@ -1,6 +1,6 @@
-import { ClientSocket, MessageMap, WsMessage, WsMessageType } from "../@interfaces";
-import { ROOM_MANAGER } from "../websocket/room-manager";
-import { broadcastToRoom } from "./broadcast.utils";
+import { ClientSocket, MessageMap, WsMessage, WsMessageType } from '../interfaces';
+import { ROOM_MANAGER } from '../room-manager';
+import { broadcastToRoom } from './broadcast.utils';
 
 export function buildWsResponse<T extends WsMessageType>(
   type: T,
@@ -13,15 +13,27 @@ export function buildWsResponse<T extends WsMessageType>(
 }
 
 export function buildConnectionEstablishedResponse(
-   participantId: string,
-   roomId: string,
-   displayName: string,
+  participantId: string,
+  roomId: string,
+  displayName: string,
 ): WsMessage<WsMessageType.CONNECTION_ESTABLISHED> {
-   return buildWsResponse(WsMessageType.CONNECTION_ESTABLISHED, {
+  return buildWsResponse<WsMessageType.CONNECTION_ESTABLISHED>(
+    WsMessageType.CONNECTION_ESTABLISHED,
+    {
       participantId,
       roomId,
-      displayName
-   });
+      displayName,
+    },
+  );
+}
+
+export function buildYjsSyncResponse(update: string): WsMessage<WsMessageType.YJS_SYNC> {
+  return buildWsResponse(
+    WsMessageType.YJS_SYNC,
+    {
+      update,
+    },
+  );
 }
 
 export function buildUserJoinedResponse(
@@ -55,24 +67,46 @@ export function buildRoomtStateResponse(
    });
 }
 
-export function handleConnectionClosed(roomId: string, participantId: string, displayName: string, client: ClientSocket): void {
-   const userLeftRes: WsMessage<WsMessageType.USER_LEFT> = buildUserLeftResponse(participantId, displayName);
+export function handleConnectionClosed(
+  roomId: string,
+  participantId: string,
+  displayName: string,
+  client: ClientSocket
+): void {
+  const userLeftRes: WsMessage<WsMessageType.USER_LEFT> =
+    buildUserLeftResponse(participantId, displayName);
 
-   client.on('close', () => { 
-      ROOM_MANAGER.leave(client);
+  client.on('close', () => {
+    const didLeave = ROOM_MANAGER.leave(client);
 
-      console.log(`${client.displayName} left the room ${client.roomId}`);
-      console.log(`${client.roomId} has ${ROOM_MANAGER.getRoomParticipants(client.roomId).size} participants`);
+    if (!didLeave) {
+      return;
+    }
 
-      broadcastToRoom(roomId, userLeftRes, client);
-   });
+    console.log(`${client.displayName} left the room ${client.roomId}`);
+    console.log(
+      `${client.roomId} has ${ROOM_MANAGER.getRoomParticipants(client.roomId).size} participants`
+    );
+
+    broadcastToRoom(roomId, userLeftRes, client);
+  });
 }
 
-export function handleConnectionErrored(roomId: string, participantId: string, displayName: string, client: ClientSocket): void {
+export function handleConnectionErrored(
+  roomId: string,
+  participantId: string,
+  displayName: string,
+  client: ClientSocket
+): void {
    const userLeftRes: WsMessage<WsMessageType.USER_LEFT> = buildUserLeftResponse(participantId, displayName);
 
-   client.on("error", (error) => {
-      ROOM_MANAGER.leave(client);
+   client.on('error', (error) => {
+      const didLeave = ROOM_MANAGER.leave(client);
+
+      if (!didLeave) {
+        return;
+      }
+
       console.error(`Socket error for ${client.participantId}`, error);
       console.log(`${client.displayName} left the room ${client.roomId}`);
       console.log(`${client.roomId} has ${ROOM_MANAGER.getRoomParticipants(client.roomId)} participants`);
