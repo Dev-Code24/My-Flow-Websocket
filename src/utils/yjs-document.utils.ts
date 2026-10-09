@@ -11,10 +11,6 @@ const YJS_DOCUMENT_KEYS = {
 
 type YElementMap = Y.Map<unknown>;
 
-// type YElementsMap = Y.Map<YElementMap>;
-//
-// type YElementOrder = Y.Array<string>;
-
 export function applyContinueImport(
   document: Y.Doc,
   elements: ContinueImportElement[],
