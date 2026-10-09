@@ -1,8 +1,9 @@
 import * as Y from 'yjs';
 
 import { YJS_REPOSITORY } from '../repository';
-import { CollaborationHistoryEntry } from "../interfaces";
+import { CollaborationHistoryEntry, ContinueImportElement } from "../interfaces";
 import { applyRedoEntry, applyUndoEntry } from "../utils/history-yjs.utils";
+import { applyContinueImport } from "../utils/yjs-document.utils";
 
 interface ReconstructedYjsDocument {
   document: Y.Doc;
@@ -10,8 +11,19 @@ interface ReconstructedYjsDocument {
   lastAppliedStreamId: string | null;
 }
 
+export type ContinueImportResult =
+  | {
+  status: 'committed';
+  updateId: string;
+  update: string;
+}
+  | {
+  status: 'already_committed';
+};
+
 const REDIS_WRITE_ATTEMPT_DELAYS_MS = [ 0, 50, 150] as const;
 const YJS_COMPACTION_UPDATE_THRESHOLD = 100;
+const CONTINUE_IMPORT_MAX_ATTEMPTS = 10;
 
 export class YjsService {
   private readonly roomsBeingCompacted = new Set<string>();
@@ -138,6 +150,55 @@ export class YjsService {
   public async getDocument(roomId: string): Promise<Y.Doc> {
     const { document } = await this.reconstructDocumentState(roomId);
     return document;
+  }
+
+  public async continueImport(
+    roomId: string,
+    requestId: string,
+    elements: ContinueImportElement[],
+  ): Promise<ContinueImportResult> {
+    for (let attempt = 0; attempt < CONTINUE_IMPORT_MAX_ATTEMPTS; ++attempt) {
+      const { document, lastAppliedStreamId } = await this.reconstructDocumentState(roomId);
+
+      try {
+        const stateVectorBeforeImport = Y.encodeStateVector(document);
+
+        applyContinueImport(document, elements);
+
+        const binaryUpdate = Y.encodeStateAsUpdate(document, stateVectorBeforeImport);
+        const update = Buffer.from(binaryUpdate).toString('base64');
+        const result = await YJS_REPOSITORY
+            .appendUpdateIfTailMatches(
+              roomId,
+              lastAppliedStreamId,
+              requestId,
+              update,
+            );
+
+        if (result.status === 'stale') {
+          continue;
+        }
+
+        if (result.status === 'already_committed') {
+          return {
+            status:
+              'already_committed',
+          };
+        }
+
+        void this.maybeCompactDocument(roomId);
+
+        return {
+          status: 'committed',
+          updateId: requestId,
+          update,
+        };
+      } finally {
+        document.destroy();
+      }
+    }
+
+    throw new Error(`Failed to commit Continue import for room ${roomId} after ${CONTINUE_IMPORT_MAX_ATTEMPTS} attempts`,);
   }
 
   public async createUndoUpdate(

@@ -31,6 +31,56 @@ export async function handleWebSocketMessage(
       return;
     }
 
+    case WsMessageType.CONTINUE_IMPORT: {
+      if (message.message.action !== 'request') {
+        return;
+      }
+
+      const { requestId, elements } = message.message;
+
+      try {
+        const result = await YJS_SERVICE.continueImport(roomId, requestId, elements);
+
+        if (result.status === 'committed') {
+          const yjsUpdateMessage: WsMessage<WsMessageType.YJS_UPDATE> = {
+            type: WsMessageType.YJS_UPDATE,
+            message: {
+              updateId: result.updateId,
+              update: result.update,
+            },
+          };
+
+          broadcastToRoom<WsMessage<WsMessageType.YJS_UPDATE>>(roomId, yjsUpdateMessage);
+        }
+
+        const completedMessage: WsMessage<WsMessageType.CONTINUE_IMPORT> = {
+          type: WsMessageType.CONTINUE_IMPORT,
+          message: {
+            action: 'result',
+            requestId,
+            status: 'completed',
+          },
+        };
+
+        broadcastToClient<WsMessage<WsMessageType.CONTINUE_IMPORT>>(completedMessage, client);
+      } catch (error) {
+        console.error(`Failed Continue import for room ${roomId}`, error);
+
+        const failedMessage: WsMessage<WsMessageType.CONTINUE_IMPORT> = {
+          type: WsMessageType.CONTINUE_IMPORT,
+          message: {
+            action: 'result',
+            requestId: message.message.requestId,
+            status: 'failed',
+          },
+        };
+
+        broadcastToClient<WsMessage<WsMessageType.CONTINUE_IMPORT>>(failedMessage, client);
+      }
+
+      return;
+    }
+
     case WsMessageType.HISTORY_ENTRY_COMMIT: {
       if (!isHistoryEntryDraft(message.message)) {
         console.error('Invalid history entry received', client.participantId);

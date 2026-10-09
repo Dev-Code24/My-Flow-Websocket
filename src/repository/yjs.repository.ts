@@ -1,6 +1,6 @@
 import { REDIS_CLIENT } from '../redis';
 import { getRoomStateTtlSeconds, getRoomYjsKeys } from '../utils';
-import { APPEND_YJS_UPDATE_SCRIPT, COMPACT_YJS_SCRIPT } from './scripts';
+import { APPEND_YJS_UPDATE_IF_TAIL_MATCHES_SCRIPT, APPEND_YJS_UPDATE_SCRIPT, COMPACT_YJS_SCRIPT } from './scripts';
 
 export interface AppendYjsUpdateResult {
   appended: boolean;
@@ -21,6 +21,20 @@ export interface YjsUpdateStreamEntry {
 export interface CommitYjsSnapshotResult {
   committed: boolean;
 }
+
+export type ConditionalAppendYjsUpdateResult =
+  | {
+  status: 'committed';
+  streamId: string;
+}
+  | {
+  status: 'already_committed';
+  streamId: string;
+}
+  | {
+  status: 'stale';
+  currentTail: string | null;
+};
 
 export class YjsRepository {
   public async appendUpdate(
@@ -141,6 +155,55 @@ export class YjsRepository {
     }
 
     return Math.max(0, streamLength - 1);
+  }
+
+  public async appendUpdateIfTailMatches(
+    roomId: string,
+    expectedTail: string | null,
+    updateId: string,
+    update: string,
+  ): Promise<ConditionalAppendYjsUpdateResult> {
+    const { updatesKey, seenUpdateIdsKey } = getRoomYjsKeys(roomId);
+
+    const ttlSeconds = getRoomStateTtlSeconds();
+
+    const result = await REDIS_CLIENT.eval(
+        APPEND_YJS_UPDATE_IF_TAIL_MATCHES_SCRIPT,
+        {
+          keys: [
+            updatesKey,
+            seenUpdateIdsKey,
+          ],
+          arguments: [
+            expectedTail ?? '',
+            updateId,
+            update,
+            String(ttlSeconds),
+          ],
+        },
+      ) as unknown as [number, string];
+
+    const [statusCode, value] = result;
+
+    if (statusCode === 1) {
+      return {
+        status: 'committed',
+        streamId: value,
+      };
+    }
+
+    if (statusCode === 2) {
+      return {
+        status: 'already_committed',
+        streamId: value,
+      };
+    }
+
+    return {
+      status: 'stale',
+      currentTail:
+        value || null,
+    };
   }
 }
 

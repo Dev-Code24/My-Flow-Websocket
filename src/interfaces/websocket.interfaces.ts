@@ -52,6 +52,23 @@ export interface EditEndRequest {
   elementIds: string[];
 }
 
+export interface ContinueImportElement {
+  id: string;
+  [key: string]: unknown;
+}
+
+export type ContinueImportPayload =
+  | {
+  action: 'request';
+  requestId: string;
+  elements: ContinueImportElement[];
+}
+  | {
+  action: 'result';
+  requestId: string;
+  status: 'completed' | 'failed';
+};
+
 interface YjsSyncPayload {
   update: string;
 }
@@ -63,6 +80,7 @@ export enum WsMessageType {
   ROOM_STATE = 'ROOM_STATE',
   YJS_SYNC = 'YJS_SYNC',
   YJS_UPDATE = 'YJS_UPDATE',
+  CONTINUE_IMPORT = 'CONTINUE_IMPORT',
   HISTORY_ENTRY_COMMIT = 'HISTORY_ENTRY_COMMIT',
   ROOM_HISTORY_STATE = 'ROOM_HISTORY_STATE',
   UNDO_REQUEST = 'UNDO_REQUEST',
@@ -91,7 +109,8 @@ export type MessageMap = {
       participants: ParticipantDetails[];
    };
   [WsMessageType.YJS_SYNC]: YjsSyncPayload;
-  [WsMessageType.YJS_UPDATE]: YjsUpdatePayload
+  [WsMessageType.YJS_UPDATE]: YjsUpdatePayload;
+  [WsMessageType.CONTINUE_IMPORT]: ContinueImportPayload;
   [WsMessageType.HISTORY_ENTRY_COMMIT]: HistoryEntryDraft;
   [WsMessageType.ROOM_HISTORY_STATE]: RoomHistoryState;
   [WsMessageType.UNDO_REQUEST]: HistoryNavigationRequest;
