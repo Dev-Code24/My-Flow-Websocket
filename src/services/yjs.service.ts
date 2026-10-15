@@ -1,9 +1,9 @@
 import * as Y from 'yjs';
 
 import { YJS_REPOSITORY } from '../repository';
-import { CollaborationHistoryEntry, ContinueImportElement } from "../interfaces";
-import { applyRedoEntry, applyUndoEntry } from "../utils/history-yjs.utils";
-import { applyContinueImport } from "../utils/yjs-document.utils";
+import { CollaborationHistoryEntry, ContinueImportElement } from '../interfaces';
+import { applyRedoEntry, applyUndoEntry } from '../utils/history-yjs.utils';
+import { applyContinueImport } from '../utils/yjs-document.utils';
 
 interface ReconstructedYjsDocument {
   document: Y.Doc;

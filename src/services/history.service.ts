@@ -7,7 +7,7 @@ import {
   RoomHistoryState,
 } from '../interfaces';
 import { HISTORY_REPOSITORY } from '../repository';
-import { YJS_SERVICE } from "./yjs.services";
+import { YJS_SERVICE } from './yjs.service';
 
 export interface UndoHistoryTarget {
   state: RoomHistoryState;

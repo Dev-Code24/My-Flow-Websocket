@@ -1,3 +1,3 @@
-export * from './history.services';
-export * from './yjs.services';
-export * from './edit.services';
+export * from './history.service';
+export * from './yjs.service';
+export * from './edit.service';

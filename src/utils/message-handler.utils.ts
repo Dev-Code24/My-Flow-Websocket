@@ -3,18 +3,20 @@ import { RawData } from 'ws';
 import { ClientSocket, WsMessage, WsMessageType } from '../interfaces';
 import { broadcastToClient, broadcastToRoom, isHistoryEntryDraft } from '../utils';
 import { EDIT_SERVICE, HISTORY_SERVICE, YJS_SERVICE } from '../services';
+import { publishRoomMessage } from "../redis";
 
 export async function handleWebSocketMessage(
-  roomId: string,
   client: ClientSocket,
   data: RawData,
 ): Promise<void> {
-  let message: WsMessage;
+  const { roomId, participantId } = client;
 
+  let message: WsMessage;
+  
   try {
     message = JSON.parse(data.toString()) as WsMessage;
   } catch (error) {
-    console.error(`Failed to parse websocket message from ${client.participantId}`, error);
+    console.error(`Failed to parse websocket message from ${participantId}`, error);
 
     return;
   }
@@ -23,6 +25,13 @@ export async function handleWebSocketMessage(
     case WsMessageType.YJS_UPDATE: {
       try {
         await YJS_SERVICE.persistUpdate(roomId, message.message.updateId, message.message.update);
+
+        try {
+          await publishRoomMessage<WsMessageType.YJS_UPDATE>(roomId, message);
+        } catch (error) {
+          console.error(`Failed to publish YJS_UPDATE for room ${roomId}`, error);
+        }
+
         broadcastToRoom<WsMessage<WsMessageType.YJS_UPDATE>>(roomId, message, client);
       } catch (error) {
         console.error('Failed to persist YJS_UPDATE', error);
@@ -49,6 +58,12 @@ export async function handleWebSocketMessage(
               update: result.update,
             },
           };
+
+          try {
+            await publishRoomMessage<WsMessageType.YJS_UPDATE>(roomId, yjsUpdateMessage);
+          } catch (error) {
+            console.error(`Failed to publish YJS_UPDATE for room ${roomId}`, error);
+          }
 
           broadcastToRoom<WsMessage<WsMessageType.YJS_UPDATE>>(roomId, yjsUpdateMessage);
         }
@@ -83,19 +98,25 @@ export async function handleWebSocketMessage(
 
     case WsMessageType.HISTORY_ENTRY_COMMIT: {
       if (!isHistoryEntryDraft(message.message)) {
-        console.error('Invalid history entry received', client.participantId);
+        console.error('Invalid history entry received', participantId);
         return;
       }
 
       try {
-        const result = await HISTORY_SERVICE.commitEntry(client.roomId, client.participantId, message.message);
+        const result = await HISTORY_SERVICE.commitEntry(roomId, participantId, message.message);
         const response: WsMessage<WsMessageType.ROOM_HISTORY_STATE> = {
           type: WsMessageType.ROOM_HISTORY_STATE,
           message: result.state,
         };
 
         if (result.appended) {
-          broadcastToRoom(client.roomId, response);
+          try {
+            await publishRoomMessage<WsMessageType.ROOM_HISTORY_STATE>(roomId, response);
+          } catch (error) {
+            console.error(`Failed to publish ROOM_HISTORY_STATE for room ${roomId}`, error);
+          }
+
+          broadcastToRoom(roomId, response);
         } else {
           broadcastToClient(response, client);
         }
@@ -122,6 +143,12 @@ export async function handleWebSocketMessage(
         },
       };
 
+      try {
+        await publishRoomMessage<WsMessageType.YJS_UPDATE>(roomId, yjsUpdateMessage);
+      } catch (error) {
+        console.error(`Failed to publish YJS_UPDATE for room ${roomId}`, error);
+      }
+
       broadcastToRoom<WsMessage<WsMessageType.YJS_UPDATE>>(roomId, yjsUpdateMessage);
 
       const roomHistoryStateMessage: WsMessage<WsMessageType.ROOM_HISTORY_STATE> = {
@@ -129,6 +156,12 @@ export async function handleWebSocketMessage(
         WsMessageType.ROOM_HISTORY_STATE,
         message: result.state,
       };
+
+      try {
+        await publishRoomMessage<WsMessageType.ROOM_HISTORY_STATE>(roomId, roomHistoryStateMessage);
+      } catch (error) {
+        console.error(`Failed to publish ROOM_HISTORY_STATE for room ${roomId}`, error);
+      }
 
       broadcastToRoom<WsMessage<WsMessageType.ROOM_HISTORY_STATE>>(roomId, roomHistoryStateMessage);
       return;
@@ -143,20 +176,32 @@ export async function handleWebSocketMessage(
       }
 
       const yjsUpdateMessage: WsMessage<WsMessageType.YJS_UPDATE> = {
-          type: WsMessageType.YJS_UPDATE,
-          message: {
-            updateId: result.updateId,
-            update: result.update,
-          },
-        };
+        type: WsMessageType.YJS_UPDATE,
+        message: {
+          updateId: result.updateId,
+          update: result.update,
+        },
+      };
+
+      try {
+        await publishRoomMessage<WsMessageType.YJS_UPDATE>(roomId, yjsUpdateMessage);
+      } catch (error) {
+        console.error(`Failed to publish YJS_UPDATE for room ${roomId}`, error);
+      }
 
       broadcastToRoom<WsMessage<WsMessageType.YJS_UPDATE>>(roomId, yjsUpdateMessage);
 
       const roomHistoryStateMessage: WsMessage<WsMessageType.ROOM_HISTORY_STATE> = {
-          type:
-          WsMessageType.ROOM_HISTORY_STATE,
-          message: result.state,
-        };
+        type:
+        WsMessageType.ROOM_HISTORY_STATE,
+        message: result.state,
+      };
+
+      try {
+        await publishRoomMessage<WsMessageType.ROOM_HISTORY_STATE>(roomId, roomHistoryStateMessage);
+      } catch (error) {
+        console.error(`Failed to publish ROOM_HISTORY_STATE for room ${roomId}`, error);
+      }
 
       broadcastToRoom<WsMessage<WsMessageType.ROOM_HISTORY_STATE>>(roomId, roomHistoryStateMessage);
 
@@ -172,7 +217,7 @@ export async function handleWebSocketMessage(
 
       const accepted = await EDIT_SERVICE.beginEdit(
           roomId,
-          client.participantId,
+          participantId,
           editId,
           elementIds,
         );
@@ -207,7 +252,7 @@ export async function handleWebSocketMessage(
 
       await EDIT_SERVICE.keepAlive(
         roomId,
-        client.participantId,
+        participantId,
         editId,
         elementIds,
       );

@@ -12,6 +12,7 @@ export interface ClientSocket extends WebSocket {
   roomId: string;
   participantId: string;
   displayName: string;
+  connectionId: string;
 }
 
 export interface WsTokenPayload extends JwtPayload {
@@ -128,3 +129,9 @@ export type WsMessage<T extends WsMessageType = WsMessageType> = {
       message: MessageMap[K];
    };
 }[T];
+
+export interface RoomParticipantPresence {
+  displayName: string;
+  connectionId: string;
+  expiresAt: number;
+}
