@@ -15,3 +15,8 @@ export function checkForEnvVariables() {
 
 export * from './websocket.utils';
 export * from './broadcast.utils';
+export * from './history-repository.utils';
+export * from './history-validation.utils';
+export * from './message-handler.utils';
+export * from './connection-handler.utils';
+export * from './room-keys.utils';

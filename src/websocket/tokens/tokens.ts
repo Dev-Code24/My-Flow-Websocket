@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { WsTokenPayload } from '../../@interfaces';
+import { WsTokenPayload } from '../../interfaces';
 
 export function verifyWsToken(token: string): WsTokenPayload {
    try {
