@@ -10,10 +10,7 @@ import {
 import { ROOM_MANAGER } from '../room-manager';
 import { HISTORY_SERVICE, YJS_SERVICE } from '../services';
 import { broadcastToClient, broadcastToRoom } from './broadcast.utils';
-import {
-  publishRoomMessage,
-  subscribeToRoom, unsubscribeToRoom,
-} from '../redis';
+import { publishRoomMessage, subscribeToRoom, unsubscribeFromRoom } from '../redis';
 import { WS_INSTANCE_ID } from '../runtime';
 
 export async function handleConnectionOpen(req: WsRequest, client: ClientSocket): Promise<void> {
@@ -117,7 +114,7 @@ async function handleConnectionClosed(client: ClientSocket): Promise<void> {
 
   if (!hasLocalParticipants) {
     try {
-      await unsubscribeToRoom(client.roomId);
+      await unsubscribeFromRoom(client.roomId);
     } catch (error) {
       console.error(`Failed to unsubscribe from room ${client.roomId}`, error);
     }
