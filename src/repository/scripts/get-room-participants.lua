@@ -12,8 +12,6 @@ for index = 1, #entries, 2 do
     if participant.expiresAt and participant.expiresAt > now then
         table.insert(result, participantId)
         table.insert(result, participant.displayName)
-    else
-        redis.call('HDEL', participantsKey, participantId)
     end
 end
 

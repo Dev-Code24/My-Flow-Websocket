@@ -22,3 +22,4 @@ export const JOIN_ROOM_PARTICIPANT_SCRIPT = loadLuaScript('join-room-participant
 export const KEEP_ALIVE_ROOM_PARTICIPANT_SCRIPT = loadLuaScript('keep-alive-room-participant.lua');
 export const LEAVE_ROOM_PARTICIPANT_SCRIPT = loadLuaScript('leave-room-participant.lua');
 export const GET_ROOM_PARTICIPANTS_SCRIPT = loadLuaScript('get-room-participants.lua');
+export const REMOVE_EXPIRED_ROOM_PARTICIPANTS_SCRIPT = loadLuaScript('remove-expired-room-participants.lua');
